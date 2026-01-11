@@ -1,0 +1,72 @@
+{
+  "project": "Lisa - Gemini Autonomous Agent",
+  "branchName": "lisa/core-setup",
+  "description": "Port of Ralph (Autonomous Agent) to Gemini",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Define core Gemini API endpoints & Auth",
+      "description": "Map the necessary Gemini CLI commands and ensure authentication matches Ralph's flow.",
+      "acceptanceCriteria": [
+        "Verify 'gemini' command is available",
+        "Document how authentication is handled (e.g., .gemini/config or env vars)",
+        "Create a 'setup_auth.sh' script if needed or verify current auth works"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Map Ralph's data models",
+      "description": "Ensure prd.json and progress tracking matches Ralph's structure exactly.",
+      "acceptanceCriteria": [
+        "prd.json structure matches Ralph's example (DONE)",
+        "Implement 'progress.txt' logging in lisa.sh",
+        "Implement 'archive/' logic for previous runs in lisa.sh"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Gemini-specific data ingestion",
+      "description": "Gemini needs explicit context injection unlike Amp.",
+      "acceptanceCriteria": [
+        "Ensure lisa.sh gathers full file tree and content",
+        "Optimize context gathering (ignore .git, node_modules, etc.)",
+        "Test with large file sets if possible (simulated)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Gemini-centric Analytics & Documentation",
+      "description": "Add analytics and documentation specific to Gemini usage.",
+      "acceptanceCriteria": [
+        "Create docs/GEMINI_API.md explaining how Lisa uses Gemini",
+        "Add simple token usage tracking if possible (log prompt length)",
+        "Ensure performance parity (measure time per iteration)"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Rigorous Testing",
+      "description": "Run the agent against itself to verify stability.",
+      "acceptanceCriteria": [
+        "Lisa runs through all previous stories autonomously",
+        "Lisa updates prd.json correctly",
+        "Lisa handles errors gracefully"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

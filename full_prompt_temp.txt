@@ -1,0 +1,264 @@
+# Role
+You are Lisa, an elite Autonomous AI Engineer. You are not a chat bot. You are a doer.
+You possess a massive context window, so you have full visibility into the entire project structure and file contents provided below.
+
+# Objective
+Your goal is to complete the Current Task defined at the bottom of this prompt.
+You must analyze the request, plan the necessary changes, and generate the code or commands to execute them.
+
+# Context Strategy
+We do not summarize. You have the full file tree and contents of all relevant files. Use this to ensure your changes are perfectly integrated, using the correct imports, variable names, and project structure.
+
+# Output Format
+You must output a single, executable BASH script block that accomplishes the task.
+Do not provide conversational filler. Just the code block.
+The script should:
+1. Create or modify files as needed (using `cat`, `echo`, or `sed`).
+2. Run any verification commands (like `ls`, `cat`, or running the script).
+3. Output a success message if everything works.
+
+Example Output:
+```bash
+#!/bin/bash
+echo "Creating main.py..."
+cat <<EOF > main.py
+print("Hello from Lisa")
+EOF
+python3 main.py
+```
+
+# Current Project State
+(The script will inject the file tree and file contents here)
+
+# Current Task
+(The script will inject the specific task here)
+
+
+# Project Context
+# Project Structure
+.
+./lisa.sh
+./hello.py
+./last_response.md
+./full_prompt_temp.txt
+./prompt.md
+./README.md
+./context.txt
+./prd.json
+
+# File Contents
+
+## File: ./lisa.sh
+```
+#!/bin/bash
+
+# Configuration
+PRD_FILE="prd.json"
+PROMPT_TEMPLATE="prompt.md"
+RESPONSE_FILE="last_response.md"
+CONTEXT_FILE="context.txt"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}Starting Lisa...${NC}"
+
+# Check for prerequisites
+if ! command -v gemini &> /dev/null; then
+    echo -e "${RED}Error: 'gemini' command not found.${NC}"
+    exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+    echo -e "${RED}Error: 'jq' command not found.${NC}"
+    exit 1
+fi
+
+# Function to get the first TODO task
+get_next_task() {
+    jq -c '.tasks[] | select(.status=="todo")' "$PRD_FILE" | head -n 1
+}
+
+# Function to update task status
+update_task_status() {
+    local task_id=$1
+    local new_status=$2
+    local temp_file=$(mktemp)
+    jq "(.tasks[] | select(.id == $task_id) | .status) = \"$new_status\"" "$PRD_FILE" > "$temp_file" && mv "$temp_file" "$PRD_FILE"
+}
+
+# Main Loop
+while true; do
+    TASK_JSON=$(get_next_task)
+
+    if [ -z "$TASK_JSON" ]; then
+        echo -e "${GREEN}All tasks completed!${NC}"
+        break
+    fi
+
+    TASK_ID=$(echo "$TASK_JSON" | jq -r '.id')
+    TASK_DESC=$(echo "$TASK_JSON" | jq -r '.description')
+
+    echo -e "${BLUE}Current Task ($TASK_ID): $TASK_DESC${NC}"
+
+    # 1. Build Context (The "Infinite" Context)
+    echo "Gathering context..."
+    echo "# Project Structure" > "$CONTEXT_FILE"
+    # Find files, excluding common noise
+    find . -maxdepth 3 -not -path '*/.*' -not -path './node_modules*' >> "$CONTEXT_FILE"
+    
+    echo -e "\n# File Contents" >> "$CONTEXT_FILE"
+    # Read all text files
+    find . -maxdepth 3 -type f \
+        -not -path '*/.*' \
+        -not -name "$CONTEXT_FILE" \
+        -not -name "$RESPONSE_FILE" \
+        -not -name "$PRD_FILE" \
+        -not -name "full_prompt_temp.txt" | while read -r file; do
+        if file "$file" | grep -q "text"; then
+            echo -e "\n## File: $file" >> "$CONTEXT_FILE"
+            echo '```' >> "$CONTEXT_FILE"
+            cat "$file" >> "$CONTEXT_FILE"
+            echo -e "\n"'```' >> "$CONTEXT_FILE"
+        fi
+    done
+
+    # 2. Construct Prompt
+    cat "$PROMPT_TEMPLATE" > full_prompt_temp.txt
+    echo -e "\n\n# Project Context" >> full_prompt_temp.txt
+    cat "$CONTEXT_FILE" >> full_prompt_temp.txt
+    echo -e "\n\n# Current Task\n$TASK_DESC" >> full_prompt_temp.txt
+
+    # 3. Call Gemini
+    echo "Sending to Gemini..."
+    # We use -o text to get clean output and pipe the prompt file
+    gemini "$(cat full_prompt_temp.txt)" --output-format text > "$RESPONSE_FILE"
+    
+    echo -e "${GREEN}Gemini Response received.${NC}"
+
+    # 4. Extract and Execute Code
+    # This sed command extracts the first bash block it finds
+    BASH_CODE=$(sed -n '/```bash/,/```/p' "$RESPONSE_FILE" | sed '1d;$d')
+
+    if [ -n "$BASH_CODE" ]; then
+        echo -e "${BLUE}Executing Gemini's plan...${NC}"
+        echo "-----------------------------------"
+        echo "$BASH_CODE"
+        echo "-----------------------------------"
+        
+        # Execute the code in a subshell
+        ( echo "$BASH_CODE" | bash )
+        EXEC_RESULT=$?
+        
+        if [ $EXEC_RESULT -eq 0 ]; then
+            echo -e "${GREEN}Execution successful!${NC}"
+            update_task_status "$TASK_ID" "done"
+        else
+            echo -e "${RED}Execution failed with exit code $EXEC_RESULT.${NC}"
+            update_task_status "$TASK_ID" "failed"
+        fi
+    else
+        echo -e "${RED}No bash code block found in response.${NC}"
+        # We'll mark it as failed so we don't loop forever
+        update_task_status "$TASK_ID" "failed_no_code"
+    fi
+    
+    echo -e "${BLUE}Task $TASK_ID status updated.${NC}"
+    echo "-----------------------------------"
+    
+    sleep 1
+done
+
+```
+
+## File: ./hello.py
+```
+print("Hello, World!")
+
+```
+
+## File: ./prompt.md
+```
+# Role
+You are Lisa, an elite Autonomous AI Engineer. You are not a chat bot. You are a doer.
+You possess a massive context window, so you have full visibility into the entire project structure and file contents provided below.
+
+# Objective
+Your goal is to complete the Current Task defined at the bottom of this prompt.
+You must analyze the request, plan the necessary changes, and generate the code or commands to execute them.
+
+# Context Strategy
+We do not summarize. You have the full file tree and contents of all relevant files. Use this to ensure your changes are perfectly integrated, using the correct imports, variable names, and project structure.
+
+# Output Format
+You must output a single, executable BASH script block that accomplishes the task.
+Do not provide conversational filler. Just the code block.
+The script should:
+1. Create or modify files as needed (using `cat`, `echo`, or `sed`).
+2. Run any verification commands (like `ls`, `cat`, or running the script).
+3. Output a success message if everything works.
+
+Example Output:
+```bash
+#!/bin/bash
+echo "Creating main.py..."
+cat <<EOF > main.py
+print("Hello from Lisa")
+EOF
+python3 main.py
+```
+
+# Current Project State
+(The script will inject the file tree and file contents here)
+
+# Current Task
+(The script will inject the specific task here)
+
+```
+
+## File: ./README.md
+```
+# Lisa - Autonomous AI Engineer
+
+Lisa is a lightweight, bash-driven autonomous agent framework designed to execute software engineering tasks using the Gemini CLI.
+
+## How it Works
+
+The project follows a loop-based execution model:
+
+1.  **Task Management**: Lisa reads tasks from `prd.json`.
+2.  **Context Gathering**: It automatically crawls the local directory to build a full context of the codebase.
+3.  **AI Orchestration**: It sends the task and context to the Gemini API using a structured prompt template (`prompt.md`).
+4.  **Execution**: It extracts executable BASH code blocks from the AI's response and runs them locally.
+5.  **Status Tracking**: It updates the task status in `prd.json` based on the execution result.
+
+## File Structure
+
+- `lisa.sh`: The core execution engine.
+- `prd.json`: The list of tasks and their current status.
+- `prompt.md`: The system prompt defining Lisa's behavior.
+- `context.txt`: A temporary file used to store the aggregated project context.
+- `last_response.md`: Stores the most recent output from the AI.
+
+## Prerequisites
+
+- `gemini` CLI tool configured in your environment.
+- `jq` for JSON processing.
+- A Unix-like shell environment (Bash).
+
+## Usage
+
+Simply run the main script to start the autonomous loop:
+
+```bash
+./lisa.sh
+```
+
+```
+
+
+# Current Task
+Refactor hello.py to include a function that takes a name as an argument.
