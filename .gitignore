@@ -1,0 +1,17 @@
+# Runtime Artifacts
+archive/
+.last-branch
+progress.txt
+context.txt
+full_prompt_temp.txt
+last_response.md
+error_log.txt
+
+# System
+.DS_Store
+Thumbs.db
+
+# Dependencies (if we add node/python later)
+node_modules/
+venv/
+__pycache__/

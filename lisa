@@ -1,0 +1,31 @@
+#!/bin/bash
+# Lisa - The Gemini CLI Plugin Loader
+# This script acts as the entry point, mimicking how Claude Code loads plugins.
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMMAND_DIR="$PLUGIN_DIR/commands"
+
+# Check if a command was provided
+if [ -z "$1" ]; then
+  echo "Usage: ./lisa [command]"
+  echo "Available commands:"
+  # Parse plugin.json for commands (simple grep/sed for now)
+  grep -A 3 '"commands":' .gemini-plugin/plugin.json | grep '"name":' | sed 's/.*"name": "\([^"]*\)".*/  - \1/'
+  echo ""
+  echo "Example: ./lisa lisa-loop"
+  exit 1
+fi
+
+CMD_NAME=$1
+shift # Shift arguments so $1 becomes the first arg for the command
+
+SCRIPT_PATH="$COMMAND_DIR/$CMD_NAME.sh"
+
+if [ -f "$SCRIPT_PATH" ]; then
+  # Execute the command script, passing remaining arguments
+  chmod +x "$SCRIPT_PATH"
+  "$SCRIPT_PATH" "$@"
+else
+  echo "Error: Command '$CMD_NAME' not found in commands/"
+  exit 1
+fi

@@ -7,14 +7,16 @@ set -e
 # Configuration
 MAX_ITERATIONS=${1:-20}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PRD_FILE="$SCRIPT_DIR/prd.json"
-PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
-ARCHIVE_DIR="$SCRIPT_DIR/archive"
-LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
-PROMPT_TEMPLATE="$SCRIPT_DIR/prompt.md"
-RESPONSE_FILE="$SCRIPT_DIR/last_response.md"
-CONTEXT_FILE="$SCRIPT_DIR/context.txt"
-FULL_PROMPT_FILE="$SCRIPT_DIR/full_prompt_temp.txt"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)" # Go up one level to root
+PRD_FILE="$PLUGIN_ROOT/prd.json"
+PROGRESS_FILE="$PLUGIN_ROOT/progress.txt"
+ARCHIVE_DIR="$PLUGIN_ROOT/archive"
+LAST_BRANCH_FILE="$PLUGIN_ROOT/.last-branch"
+PROMPT_TEMPLATE="$PLUGIN_ROOT/prompt.md"
+RESPONSE_FILE="$PLUGIN_ROOT/last_response.md"
+CONTEXT_FILE="$PLUGIN_ROOT/context.txt"
+FULL_PROMPT_FILE="$PLUGIN_ROOT/full_prompt_temp.txt"
+HOOKS_DIR="$PLUGIN_ROOT/hooks"
 
 # Colors
 GREEN='\033[0;32m'
@@ -68,6 +70,15 @@ if [ ! -f "$PROGRESS_FILE" ]; then
 fi
 
 # --- Helper Functions ---
+
+# Trap Ctrl+C for safe exit
+trap ctrl_c INT
+
+ctrl_c() {
+    echo -e "\n${RED}Lisa interrupted by user. Saving state...${NC}"
+    log_progress "Interrupted by User"
+    exit 130
+}
 
 get_next_story() {
     # Find first story where 'passes' is false
@@ -128,7 +139,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
             echo -e "\n## File: $file" >> "$CONTEXT_FILE"
             echo '```' >> "$CONTEXT_FILE"
             cat "$file" >> "$CONTEXT_FILE"
-            echo -e "\n"'```' >> "$CONTEXT_FILE"
+            echo -e "\n'```'" >> "$CONTEXT_FILE"
         fi
     done
 
@@ -168,14 +179,28 @@ for i in $(seq 1 $MAX_ITERATIONS); do
         
         if [ $EXEC_EXIT_CODE -eq 0 ]; then
             echo -e "${GREEN}Execution successful.${NC}"
-            # Logic: If execution was successful, we assume the story might be passed.
-            # Real Ralph asks the agent if it's done. Here we'll ask Gemini to verify in the next loop, 
-            # OR we can assume done if the script ran without error.
-            # For this "Clone", let's update status to PASSES=true to simulate progress.
-            update_story_status "$STORY_ID" "true"
-            log_progress "Completed $STORY_ID"
+            
+            # --- LISA ENHANCED VALIDATION ---
+            if [ -f "$HOOKS_DIR/validate.sh" ]; then
+                echo -e "${BLUE}Running Validation Hook...${NC}"
+                "$HOOKS_DIR/validate.sh"
+                VALIDATION_EXIT_CODE=$?
+            else
+                VALIDATION_EXIT_CODE=0
+            fi
+
+            if [ $VALIDATION_EXIT_CODE -eq 0 ]; then
+                echo -e "${GREEN}Validation Passed. Marking story as complete.${NC}"
+                update_story_status "$STORY_ID" "true"
+                log_progress "Completed $STORY_ID"
+            else
+                echo -e "${RED}Validation Failed.${NC}"
+                [ -f "$HOOKS_DIR/stop-hook.sh" ] && "$HOOKS_DIR/stop-hook.sh" "$STORY_ID" "Validation Failed"
+                log_progress "Validation Failed for $STORY_ID"
+            fi
         else
             echo -e "${RED}Execution failed.${NC}"
+            [ -f "$HOOKS_DIR/stop-hook.sh" ] && "$HOOKS_DIR/stop-hook.sh" "$STORY_ID" "Execution Failed (Exit Code: $EXEC_EXIT_CODE)"
             log_progress "Failed $STORY_ID (Exit Code: $EXEC_EXIT_CODE)"
         fi
     else

@@ -1,0 +1,15 @@
+{
+  "name": "lisa-gemini-agent",
+  "version": "0.1.0",
+  "description": "Port of Ralph (Autonomous Agent) to Gemini",
+  "commands": [
+    {
+      "name": "lisa-loop",
+      "description": "Start the autonomous development loop",
+      "usage": "/lisa-loop [max-iterations]"
+    }
+  ],
+  "hooks": {
+    "stop": "hooks/stop-hook.sh"
+  }
+}
